@@ -1,1 +1,186 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Edit, CheckCircle } from 'lucide-react';
 
+const StudyPlanner = () => {
+  const [courses, setCourses] = useState(() => {
+    const saved = localStorage.getItem('courses');
+    return saved ? JSON.parse(saved) : [
+      { id: 1, name: 'Mathématiques', priority: 'urgent', studied: null },
+      { id: 2, name: 'Physique', priority: 'limite', studied: null },
+      { id: 3, name: 'Informatique', priority: 'a-faire', studied: null },
+      { id: 4, name: 'Histoire', priority: 'okay', studied: null },
+    ];
+  });
+  const [newCourseName, setNewCourseName] = useState('');
+  const [filterPriority, setFilterPriority] = useState('all');
+
+  useEffect(() => {
+    localStorage.setItem('courses', JSON.stringify(courses));
+  }, [courses]);
+
+  const priorityOrder = ['urgent', 'limite', 'a-faire', 'okay'];
+
+  const priorities = {
+    urgent: { label: 'Urgent', textColor: 'text-red-500' },
+    limite: { label: 'Limite', textColor: 'text-amber-500' },
+    'a-faire': { label: 'À faire', textColor: 'text-indigo-500' },
+    okay: { label: 'Okay', textColor: 'text-green-500' }
+  };
+
+  const studyLevels = [
+    { value: 'peu', label: 'Un peu' },
+    { value: 'beaucoup', label: 'Beaucoup' },
+    { value: 'avance', label: 'En avance' }
+  ];
+
+  const handlePriorityChange = (courseId, newPriority) => {
+    setCourses(courses.map(course => 
+      course.id === courseId ? { ...course, priority: newPriority } : course
+    ));
+  };
+
+  const getPreviousPriority = (currentPriority) => {
+    const currentIndex = priorityOrder.indexOf(currentPriority);
+    return currentIndex < priorityOrder.length - 1 ? priorityOrder[currentIndex + 1] : currentPriority;
+  };
+
+  const handleStudyProgress = (courseId, level) => {
+    setCourses(courses.map(course => {
+      if (course.id === courseId) {
+        let newPriority = course.priority;
+        
+        if (level === 'avance') {
+          newPriority = 'okay';
+        } else if (level === 'beaucoup' || level === 'peu') {
+          newPriority = getPreviousPriority(course.priority);
+        }
+        
+        return {
+          ...course,
+          priority: newPriority,
+          studied: null // Réinitialise l'état studied après le clic
+        };
+      }
+      return course;
+    }));
+  };
+
+  const addCourse = () => {
+    if (newCourseName.trim()) {
+      setCourses([
+        ...courses,
+        {
+          id: Date.now(),
+          name: newCourseName.trim(),
+          priority: 'a-faire',
+          studied: null
+        }
+      ]);
+      setNewCourseName('');
+    }
+  };
+
+  const sortCourses = (coursesToSort) => {
+    return [...coursesToSort].sort((a, b) => {
+      return priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority);
+    });
+  };
+
+  const filteredCourses = filterPriority === 'all' 
+    ? sortCourses(courses)
+    : sortCourses(courses.filter(course => course.priority === filterPriority));
+
+  return (
+    <Card className="w-full max-w-3xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>Planificateur d'études</span>
+          <Button variant="outline" size="icon">
+            <Edit className="w-5 h-5" />
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex space-x-2 mb-4">
+          <Input
+            placeholder="Nouveau cours..."
+            value={newCourseName}
+            onChange={(e) => setNewCourseName(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && addCourse()}
+          />
+          <Button onClick={addCourse}>
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter
+          </Button>
+        </div>
+
+        <div className="flex space-x-2 mb-4">
+          <Button
+            variant={filterPriority === 'all' ? 'secondary' : 'outline'}
+            onClick={() => setFilterPriority('all')}
+          >
+            Tous
+          </Button>
+          {priorityOrder.map(key => (
+            <Button
+              key={key}
+              variant={filterPriority === key ? 'secondary' : 'outline'}
+              onClick={() => setFilterPriority(key)}
+              className="flex items-center"
+            >
+              <span className={priorities[key].textColor}>{priorities[key].label}</span>
+            </Button>
+          ))}
+        </div>
+
+        <div className="space-y-4">
+          {filteredCourses.map(course => (
+            <div key={course.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+              <div className="flex items-center space-x-4">
+                <span className="font-medium">{course.name}</span>
+                <Select
+                  value={course.priority}
+                  onValueChange={(value) => handlePriorityChange(course.id, value)}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue>
+                      <span className={priorities[course.priority].textColor}>
+                        {priorities[course.priority].label}
+                      </span>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {priorityOrder.map(key => (
+                      <SelectItem key={key} value={key}>
+                        <span className={priorities[key].textColor}>{priorities[key].label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center space-x-2">
+                {studyLevels.map(level => (
+                  <Button
+                    key={level.value}
+                    variant={course.studied === level.value ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={() => handleStudyProgress(course.id, level.value)}
+                    className="whitespace-nowrap"
+                  >
+                    {level.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default StudyPlanner;
